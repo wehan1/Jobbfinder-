@@ -1,13 +1,17 @@
 # Job preferences
+<!-- Inferred from Indeed resume 2026-10-21 — CONFIRM. -->
 
 ## Target roles
-- TODO: e.g. "Backend developer", "Data analyst"
+- Distribution Engineer (utility)
+- Electrical Design Engineer
+- Electrical Engineer (building/MEP, power)
 
 ## Seniority
-- TODO: junior / mid / senior
+- Early-career / Engineer I–II (inferred: ~3 years experience since 2022)
 
 ## Locations
-- TODO: e.g. Oslo, Stockholm, Remote (EU)
+- Seattle / Puget Sound, WA (primary, inferred)
+- Willing to relocate (per Indeed)
 
 ## Salary
 - Minimum: TODO
@@ -17,8 +21,7 @@
 - TODO
 
 ## Dealbreakers
-- TODO: e.g. no on-call, no relocation, no consulting agencies
+- TODO
 
 ## Job sources to search
-- Indeed (via Indeed connector if available)
-- TODO: e.g. finn.no, arbetsformedlingen.se, jobindex.dk, LinkedIn
+- Indeed (connector available)
