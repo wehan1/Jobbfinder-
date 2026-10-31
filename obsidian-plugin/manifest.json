@@ -1,0 +1,9 @@
+{
+  "id": "jarvis-agentic-os",
+  "name": "Jarvis",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Talk to your Jarvis agentic OS from inside the vault. Same router, brain, skills and memory as the Jarvis web app.",
+  "author": "you",
+  "isDesktopOnly": true
+}

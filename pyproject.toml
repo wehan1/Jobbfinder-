@@ -1,0 +1,22 @@
+[project]
+name = "jarvis-os"
+version = "0.1.0"
+description = "Personal agentic OS: three-tier router, two-mode brain, skills, local voice, one Obsidian vault."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+voice = ["faster-whisper>=1.0", "kokoro>=0.9", "soundfile", "numpy"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+jarvis = "jarvis.__main__:main"
+
+[tool.setuptools]
+packages = ["jarvis"]
+
+[tool.setuptools.package-data]
+jarvis = ["web/*", "default_skills/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

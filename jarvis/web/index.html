@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis</title>
+<style>
+  :root { --bg:#f7f7f5; --panel:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e4e4e0; --accent:#3a5bd9;
+          --t1:#2f855a; --t2:#b7791f; --t3:#6b46c1; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141416; --panel:#1d1d20; --ink:#ececee; --muted:#9a9aa2;
+          --line:#2c2c31; --accent:#7d97ff; --t1:#68d391; --t2:#f6c26b; --t3:#b794f4; } }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--ink);
+      font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; height:100vh; display:flex; flex-direction:column }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel) }
+  header h1 { font-size:16px; margin:0 } header .vault { color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 }
+  header select, header button, header input { font:inherit; font-size:13px }
+  main { flex:1; display:flex; min-height:0 }
+  #chat { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px }
+  .msg { max-width:780px; padding:10px 14px; border-radius:12px; background:var(--panel); border:1px solid var(--line); white-space:pre-wrap; word-wrap:break-word }
+  .msg.you { align-self:flex-end; background:var(--accent); color:#fff; border-color:transparent }
+  .meta { font-size:12px; color:var(--muted); margin-top:6px; white-space:normal }
+  .badge { display:inline-block; padding:0 6px; border-radius:6px; font-weight:600; color:#fff; margin-right:6px }
+  .b1{background:var(--t1)} .b2{background:var(--t2)} .b3{background:var(--t3)}
+  aside { width:300px; border-left:1px solid var(--line); background:var(--panel); padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px }
+  aside h2 { font-size:13px; margin:6px 0 0; color:var(--muted); text-transform:uppercase; letter-spacing:.04em }
+  aside input, aside textarea { width:100%; font:inherit; padding:6px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink) }
+  aside ul { margin:0; padding-left:16px; font-size:13px } aside li { cursor:pointer } aside li:hover { color:var(--accent) }
+  form#composer { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line); background:var(--panel) }
+  #input { flex:1; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--ink); resize:none; min-height:44px; max-height:200px }
+  button { border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:10px; padding:8px 12px; cursor:pointer }
+  button.primary { background:var(--accent); color:#fff; border-color:transparent }
+  #mic.rec { background:#d93a3a; color:#fff }
+  @media (max-width: 760px) { aside { display:none } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Jarvis</h1>
+  <span class="vault" id="vault">connecting…</span>
+  <label title="Brain mode for tier-3 work">mode
+    <select id="mode"><option value="">auto</option><option value="build">build</option><option value="code">code</option></select>
+  </label>
+  <label><input type="checkbox" id="speak"> speak</label>
+  <button id="tokenBtn" title="Set API token">token</button>
+</header>
+<main>
+  <section id="chat"></section>
+  <aside>
+    <h2>Skills</h2><ul id="skills"></ul>
+    <h2>Search vault</h2><input id="q" placeholder="search notes…"><ul id="hits"></ul>
+    <h2>New note</h2>
+    <input id="noteTitle" placeholder="Title">
+    <textarea id="noteBody" rows="5" placeholder="Body (saved to Jarvis/Inbox/)"></textarea>
+    <button id="saveNote">Save to vault</button>
+    <h2>Recent notes</h2><ul id="recent"></ul>
+  </aside>
+</main>
+<form id="composer">
+  <textarea id="input" rows="1" placeholder="Ask, or /research, /repurpose, /qa, /deep, /quick, /code…"></textarea>
+  <button type="button" id="mic" title="Hold to talk (local Whisper)">🎙</button>
+  <button class="primary" type="submit">Send</button>
+</form>
+<script>
+const $ = s => document.querySelector(s);
+let token = ''; try { token = localStorage.getItem('jarvis_token') || '' } catch {}
+const history = [];
+const hdr = (extra={}) => ({ ...(token ? {Authorization: 'Bearer ' + token} : {}), ...extra });
+async function api(path, opts={}) {
+  const r = await fetch(path, { ...opts, headers: hdr(opts.headers) });
+  if (r.status === 401) { askToken(); throw new Error('unauthorized'); }
+  const ct = r.headers.get('content-type') || '';
+  const data = ct.includes('json') ? await r.json() : await r.blob();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+function askToken() { const t = prompt('Jarvis API token (JARVIS_TOKEN):', token); if (t !== null) { token = t.trim(); try { localStorage.setItem('jarvis_token', token) } catch {} } }
+$('#tokenBtn').onclick = askToken;
+
+function add(role, text, res) {
+  const el = document.createElement('div'); el.className = 'msg ' + role; el.textContent = text;
+  if (res) {
+    const m = document.createElement('div'); m.className = 'meta';
+    const b = document.createElement('span'); b.className = 'badge b' + res.tier;
+    b.textContent = ['', 'rules', 'fast', 'real work'][res.tier] + (res.escalated ? ' ↑' : '');
+    m.append(b, `${res.model || ''}${res.skill ? ' · skill ' + res.skill : ''} · ${res.route.reason} · ${res.latency_ms}ms`);
+    if (res.transcript) m.append(document.createElement('br'), '🎙 heard: ' + res.transcript);
+    if (res.sources && res.sources.length) m.append(document.createElement('br'), 'notes: ' + res.sources.map(s => `${s.path} (${s.date})`).join(', '));
+    if (res.saved && res.saved.length) m.append(document.createElement('br'), 'saved: ' + res.saved.join(', '));
+    el.append(m);
+  }
+  $('#chat').append(el); el.scrollIntoView({block: 'end'});
+  return el;
+}
+function play(b64) { if (b64) new Audio('data:audio/wav;base64,' + b64).play().catch(() => {}); }
+function done(res) {
+  add('jarvis', res.reply, res);
+  history.push({role: 'user', content: res.transcript || lastText}, {role: 'assistant', content: res.reply});
+  play(res.audio_b64); refreshSide();
+}
+let lastText = '';
+$('#composer').onsubmit = async e => {
+  e.preventDefault(); const text = $('#input').value.trim(); if (!text) return;
+  lastText = text; $('#input').value = ''; add('you', text);
+  const pending = add('jarvis', '…');
+  try {
+    const res = await api('/api/chat', { method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text, source: 'web', history: history.slice(-10), mode: $('#mode').value || null, speak: $('#speak').checked }) });
+    pending.remove(); done(res);
+  } catch (err) { pending.textContent = '⚠ ' + err.message; }
+};
+$('#input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#composer').requestSubmit(); } });
+
+// push-to-talk → local Whisper on the server
+let rec, chunks = [];
+async function startRec() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    rec = new MediaRecorder(stream); chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = sendAudio; rec.start(); $('#mic').classList.add('rec');
+  } catch (err) { add('jarvis', '⚠ microphone unavailable: ' + err.message); }
+}
+function stopRec() { if (rec && rec.state === 'recording') { rec.stop(); rec.stream.getTracks().forEach(t => t.stop()); $('#mic').classList.remove('rec'); } }
+async function sendAudio() {
+  const blob = new Blob(chunks, {type: rec.mimeType || 'audio/webm'});
+  const pending = add('jarvis', '🎙 transcribing…');
+  try {
+    const qs = new URLSearchParams({source: 'web', speak: $('#speak').checked ? '1' : '0', mode: $('#mode').value});
+    const res = await api('/api/voice?' + qs, { method: 'POST', headers: {'Content-Type': blob.type.split(';')[0]}, body: blob });
+    pending.remove(); add('you', '🎙 ' + res.transcript); done(res);
+  } catch (err) { pending.textContent = '⚠ ' + err.message; }
+}
+$('#mic').addEventListener('pointerdown', startRec);
+['pointerup', 'pointerleave'].forEach(ev => $('#mic').addEventListener(ev, stopRec));
+
+async function openNote(path) {
+  try { const n = await api('/api/note?path=' + encodeURIComponent(path)); add('jarvis', `${n.path}\n\n${n.content}`); } catch (e) { add('jarvis', '⚠ ' + e.message); }
+}
+function list(el, items, label, onClick) {
+  el.replaceChildren(...items.map(it => { const li = document.createElement('li'); li.textContent = label(it); li.onclick = () => onClick(it); return li; }));
+}
+async function refreshSide() {
+  try {
+    list($('#recent'), await api('/api/notes?n=12'), x => x, openNote);
+  } catch {}
+}
+let qTimer;
+$('#q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(async () => {
+  const q = $('#q').value.trim(); if (!q) return $('#hits').replaceChildren();
+  try { list($('#hits'), await api('/api/search?k=8&q=' + encodeURIComponent(q)), h => `${h.path}${h.heading ? ' › ' + h.heading : ''}`, h => openNote(h.path)); } catch {}
+}, 250); };
+$('#saveNote').onclick = async () => {
+  const title = $('#noteTitle').value.trim(); if (!title) return;
+  try {
+    const r = await api('/api/note', { method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ title, content: $('#noteBody').value, source: 'web' }) });
+    add('jarvis', 'Saved ' + r.saved + ' — it is now in your Obsidian vault.'); $('#noteTitle').value = $('#noteBody').value = ''; refreshSide();
+  } catch (e) { add('jarvis', '⚠ ' + e.message); }
+};
+(async () => {
+  try {
+    const h = await (await fetch('/api/health')).json(); $('#vault').textContent = 'vault: ' + h.vault;
+    if (h.auth && !token) askToken();
+    list($('#skills'), await api('/api/skills'), s => `/${s.name} — ${s.description}`, s => { $('#input').value = `/${s.name} `; $('#input').focus(); });
+    refreshSide();
+  } catch (e) { $('#vault').textContent = '⚠ ' + e.message; }
+})();
+</script>
+</body>
+</html>

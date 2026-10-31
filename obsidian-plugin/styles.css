@@ -1,0 +1,9 @@
+.jarvis-view { display: flex; flex-direction: column; height: 100%; }
+.jarvis-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.jarvis-msg { padding: 8px 10px; border-radius: 8px; background: var(--background-secondary); white-space: pre-wrap; word-wrap: break-word; user-select: text; }
+.jarvis-msg.you { background: var(--interactive-accent); color: var(--text-on-accent); align-self: flex-end; max-width: 90%; }
+.jarvis-meta { font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: 4px; white-space: normal; }
+.jarvis-meta a { cursor: pointer; }
+.jarvis-input { display: flex; gap: 6px; padding-top: 6px; border-top: 1px solid var(--background-modifier-border); }
+.jarvis-input textarea { flex: 1; resize: vertical; min-height: 3em; }
+.jarvis-warn { color: var(--text-error); font-size: var(--font-ui-smaller); padding: 4px 0; }
